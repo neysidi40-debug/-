@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f2ead7">
+  <title>ZOO // conversa anônima</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="scanlines" aria-hidden="true"></div>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="#top" aria-label="ZOO, página inicial">
+        <img class="brand-mark" src="sonicchapado.jpeg" alt="Imagem da ZOO" />
+        <span><strong>ZOO</strong><small>um ZOO de convenienciakkk</small></span>
+      </a>
+      <div class="header-status">⛧</div>
+      <button class="new-topic-button" id="focus-chat" type="button"><span>＋</span> abrir ZOO</button>
+    </div>
+  </header>
+
+  <main class="layout" id="top">
+    <aside class="sidebar">
+      <figure class="hero-image">
+        <img src="sonicchapado.jpeg" alt="Boneco azul iluminado por uma chama" />
+        <figcaption>tropa do sonicchapado / onde day</figcaption>
+      </figure>
+      <div class="intro-copy">
+        <p class="eyebrow">tamo anonimo s2</p>
+        <h1>e se dar certo?<br><em>happy nation</em></h1>
+        <p class="intro-text">sabia oticas e lentes, Cavalo Consultorias, Rato Bebidas 24H, Macaco Auto Peças e Camisa 10de lucifer.</p>
+      </div>
+
+      <nav class="rooms" aria-label="Salas do fórum">
+        <div class="section-label"><span>sala única</span><span>01</span></div>
+        <button class="room room-chat active" data-room="zoo"><span class="room-icon">◉</span><span>ZOO</span><b>ao vivo</b></button>
+      </nav>
+
+      <div class="sidebar-note">
+        <span class="note-icon">⌁</span>
+        <p>AQUI NÃO USAMOS NOMES <br>FUCK YOU.</p>
+      </div>
+    </aside>
+
+    <section class="board" aria-label="Sala de conversa ZOO">
+      <div class="board-topline">
+        <div>
+          <p class="eyebrow">chat / <span id="room-label">ZOO</span></p>
+          <h2 id="board-title">ZOO <span class="live-badge">conversa</span></h2>
+        </div>
+        <div class="sort-control" id="sort-control"><span>ordenar por</span><button type="button" id="sort-button">mais recentes⌄</button></div>
+      </div>
+
+      <div class="composer" id="composer">
+        <div class="composer-heading"><span class="composer-avatar">?</span><span>você está anônimo nesta conversa</span><span class="lock">⌑ sem perfil</span></div>
+        <textarea id="topic-input" maxlength="180" placeholder="comece uma conversa..." aria-label="Texto do novo tópico"></textarea>
+        <div class="composer-actions"><div><button class="tiny-action" type="button">◎ anônimo</button><button class="tiny-action" type="button"># adicionar sala</button></div><button class="publish-button" id="publish-topic" type="button">publicar tópico <span>↗</span></button></div>
+      </div>
+
+      <div class="topic-list" id="topic-list"></div>
+      <button class="load-more" id="load-more" type="button">carregar mais conversas <span>↓</span></button>
+
+      <div class="chat-view" id="chat-view" hidden>
+        <div class="chat-notice"><span>◉</span><strong>ZOO</strong><span>.</span></div>
+        <div class="chat-messages" id="chat-messages" aria-live="polite"></div>
+        <form class="chat-composer" id="chat-form">
+          <span class="chat-avatar">?</span>
+          <input id="chat-input" maxlength="280" autocomplete="off" placeholder="escreva uma mensagem..." aria-label="Mensagem para a sala ZOO">
+          <button type="submit" aria-label="Enviar mensagem">↗</button>
+        </form>
+        <p class="chat-footer">conversa anônima <span>·</span> sem nomes ou perfis</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer"><span>ZOO © ⛧</span><span>⛧</span><span><a href="#rules">regras</a> · <a href="#about">sobre o anonimato</a></span></footer>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

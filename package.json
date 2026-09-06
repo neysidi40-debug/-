@@ -1,0 +1,14 @@
+{
+  "name": "zoo-chat",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sala de conversa anônima ZOO",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
