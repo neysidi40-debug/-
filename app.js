@@ -1,5 +1,6 @@
 let topics = [];
 let chatMessages = [];
+const renderedChatKeys = new Set();
 const supabaseSettings = window.ZOO_SUPABASE || {};
 const supabaseClient = window.supabase && supabaseSettings.url && supabaseSettings.anonKey
   ? window.supabase.createClient(supabaseSettings.url, supabaseSettings.anonKey)
@@ -41,13 +42,32 @@ function renderTopics() {
 }
 
 function renderChat() {
-  chatMessagesList.innerHTML = chatMessages.map((message, index) => `
-    <article class="chat-message ${message.author === 'anônimo' ? 'mine' : ''}" style="animation-delay: ${index * 45}ms">
+  const incomingKeys = new Set(chatMessages.map(messageKey));
+  const databaseWasCleared = [...renderedChatKeys].some((key) => !incomingKeys.has(key));
+  if (databaseWasCleared) {
+    chatMessagesList.replaceChildren();
+    renderedChatKeys.clear();
+  }
+
+  let addedMessage = false;
+  chatMessages.forEach((message) => {
+    const key = messageKey(message);
+    if (renderedChatKeys.has(key)) return;
+    const messageElement = document.createElement('article');
+    messageElement.className = `chat-message ${message.author === 'anônimo' ? 'mine' : ''}`;
+    messageElement.innerHTML = `
       <div class="chat-message-top"><strong>${escapeHtml(message.author)}</strong><span>${message.time}</span></div>
       <p>${escapeHtml(message.text)}</p>
-    </article>
-  `).join('');
-  chatMessagesList.scrollTop = chatMessagesList.scrollHeight;
+    `;
+    chatMessagesList.append(messageElement);
+    renderedChatKeys.add(key);
+    addedMessage = true;
+  });
+  if (addedMessage) chatMessagesList.scrollTop = chatMessagesList.scrollHeight;
+}
+
+function messageKey(message) {
+  return message.id || `${message.createdAt}-${message.text}`;
 }
 
 function formatMessageTime(createdAt) {
@@ -171,7 +191,7 @@ chatForm.addEventListener('submit', async (event) => {
 renderTopics();
 showRoom('zoo');
 loadChatMessages();
-window.setInterval(loadChatMessages, 2000);
+if (!supabaseClient) window.setInterval(loadChatMessages, 2000);
 if (supabaseClient) {
   supabaseClient
     .channel('zoo-messages')
