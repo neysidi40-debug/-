@@ -1,200 +1,112 @@
-let topics = [];
 let chatMessages = [];
 const renderedChatKeys = new Set();
+const nicknameStorageKey = 'zoo-anonymous-nickname';
 const supabaseSettings = window.ZOO_SUPABASE || {};
 const supabaseClient = window.supabase && supabaseSettings.url && supabaseSettings.anonKey
-  ? window.supabase.createClient(supabaseSettings.url, supabaseSettings.anonKey)
-  : null;
-let activeRoom = 'zoo';
-const topicList = document.querySelector('#topic-list');
-const roomLabel = document.querySelector('#room-label');
-const boardTitle = document.querySelector('#board-title');
-const input = document.querySelector('#topic-input');
-const toast = document.querySelector('#toast');
-const composer = document.querySelector('#composer');
-const loadMore = document.querySelector('#load-more');
-const sortControl = document.querySelector('#sort-control');
-const chatView = document.querySelector('#chat-view');
+	? window.supabase.createClient(supabaseSettings.url, supabaseSettings.anonKey)
+	: null;
 const chatMessagesList = document.querySelector('#chat-messages');
 const chatForm = document.querySelector('#chat-form');
 const chatInput = document.querySelector('#chat-input');
 
-function roomName(room) {
-  if (room === 'zoo') return 'ZOO';
-  return room === 'todos' ? 'todas as conversas' : room;
+function getNickname() {
+	return localStorage.getItem(nicknameStorageKey) || 'anônimo';
 }
 
-function renderTopics() {
-  const filtered = activeRoom === 'todos' ? topics : topics.filter((topic) => topic.room === activeRoom);
-  topicList.innerHTML = filtered.map((topic, index) => `
-    <article class="topic" style="animation-delay: ${index * 45}ms">
-      <div class="topic-avatar">${topic.mark || '✳'}</div>
-      <div class="topic-main">
-        <a class="topic-title" href="#conversation">${escapeHtml(topic.title)}</a>
-        <div class="topic-meta"><span class="room-tag">#${topic.room}</span> · ${topic.author} · ${topic.time}</div>
-      </div>
-      <div class="topic-stats">
-        <div><strong>${topic.replies}</strong><span>respostas</span></div>
-        <div><strong>${topic.views}</strong><span>leituras</span></div>
-      </div>
-    </article>
-  `).join('') || '<p class="empty-state">ainda não há conversas nesta sala.</p>';
-}
-
-function renderChat() {
-  const incomingKeys = new Set(chatMessages.map(messageKey));
-  const databaseWasCleared = [...renderedChatKeys].some((key) => !incomingKeys.has(key));
-  if (databaseWasCleared) {
-    chatMessagesList.replaceChildren();
-    renderedChatKeys.clear();
-  }
-
-  let addedMessage = false;
-  chatMessages.forEach((message) => {
-    const key = messageKey(message);
-    if (renderedChatKeys.has(key)) return;
-    const messageElement = document.createElement('article');
-    messageElement.className = `chat-message ${message.author === 'anônimo' ? 'mine' : ''}`;
-    messageElement.innerHTML = `
-      <div class="chat-message-top"><strong>${escapeHtml(message.author)}</strong><span>${message.time}</span></div>
-      <p>${escapeHtml(message.text)}</p>
-    `;
-    chatMessagesList.append(messageElement);
-    renderedChatKeys.add(key);
-    addedMessage = true;
-  });
-  if (addedMessage) chatMessagesList.scrollTop = chatMessagesList.scrollHeight;
+function setupNicknameField() {
+	if (!chatForm || !chatInput) return;
+	const nicknameInput = document.createElement('input');
+	nicknameInput.id = 'nickname-input';
+	nicknameInput.maxLength = 30;
+	nicknameInput.value = getNickname();
+	nicknameInput.placeholder = 'seu apelido';
+	nicknameInput.className = 'nickname-input';
+	nicknameInput.style.flex = '0 1 140px';
+	nicknameInput.style.borderBottom = '1px solid var(--line)';
+	nicknameInput.style.padding = '6px 0';
+	nicknameInput.setAttribute('aria-label', 'Seu apelido anônimo');
+	nicknameInput.addEventListener('change', () => {
+		const nickname = nicknameInput.value.trim().slice(0, 30) || 'anônimo';
+		nicknameInput.value = nickname;
+		localStorage.setItem(nicknameStorageKey, nickname);
+	});
+	chatForm.insertBefore(nicknameInput, chatInput);
 }
 
 function messageKey(message) {
-  return message.id || `${message.createdAt}-${message.text}`;
+	return message.id || `${message.created_at || message.createdAt}-${message.nickname}-${message.text}`;
 }
 
 function formatMessageTime(createdAt) {
-  return new Date(createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-}
-
-async function loadChatMessages() {
-  try {
-    if (supabaseClient) {
-      const { data, error } = await supabaseClient
-        .from('messages')
-        .select('id, text, created_at')
-        .order('created_at', { ascending: true })
-        .limit(100);
-      if (error) throw error;
-      chatMessages = data.map((message) => ({
-        ...message,
-        author: 'anônimo',
-        time: formatMessageTime(message.created_at)
-      }));
-    } else {
-      const response = await fetch('/api/messages', { cache: 'no-store' });
-      if (!response.ok) throw new Error('Não foi possível carregar as mensagens.');
-      const messages = await response.json();
-      chatMessages = messages.map((message) => ({ ...message, time: formatMessageTime(message.createdAt) }));
-    }
-    renderChat();
-  } catch (error) {
-    showToast('não foi possível conectar à ZOO.');
-  }
-}
-
-function showRoom(room) {
-  const isChat = room === 'zoo';
-  composer.hidden = isChat;
-  topicList.hidden = isChat;
-  loadMore.hidden = isChat;
-  sortControl.hidden = isChat;
-  chatView.hidden = !isChat;
-  roomLabel.textContent = roomName(room);
-  boardTitle.innerHTML = isChat ? 'ZOO <span class="live-badge">conversa</span>' : 'conversas recentes <span class="live-badge">ao vivo</span>';
-  if (isChat) renderChat();
+	return new Date(createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
 function escapeHtml(value) {
-  return value.replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' })[character]);
+	return String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' })[character]);
 }
 
-function showToast(message) {
-  toast.textContent = message;
-  toast.classList.add('show');
-  window.setTimeout(() => toast.classList.remove('show'), 2600);
+function renderChat() {
+	const incomingKeys = new Set(chatMessages.map(messageKey));
+	if ([...renderedChatKeys].some((key) => !incomingKeys.has(key))) {
+		chatMessagesList.replaceChildren();
+		renderedChatKeys.clear();
+	}
+	let addedMessage = false;
+	chatMessages.forEach((message) => {
+		const key = messageKey(message);
+		if (renderedChatKeys.has(key)) return;
+		const createdAt = message.created_at || message.createdAt;
+		const article = document.createElement('article');
+		article.className = 'chat-message';
+		article.innerHTML = `<div class="chat-message-top"><strong>${escapeHtml(message.nickname || 'anônimo')}</strong><span>${formatMessageTime(createdAt)}</span></div><p>${escapeHtml(message.text)}</p>`;
+		chatMessagesList.append(article);
+		renderedChatKeys.add(key);
+		addedMessage = true;
+	});
+	if (addedMessage) chatMessagesList.scrollTop = chatMessagesList.scrollHeight;
 }
 
-document.querySelectorAll('.room').forEach((button) => {
-  button.addEventListener('click', () => {
-    document.querySelector('.room.active').classList.remove('active');
-    button.classList.add('active');
-    activeRoom = button.dataset.room;
-    roomLabel.textContent = roomName(activeRoom);
-    showRoom(activeRoom);
-    if (activeRoom !== 'zoo') renderTopics();
-  });
+async function loadChatMessages() {
+	try {
+		if (!supabaseClient) throw new Error('Supabase não configurado.');
+		const { data, error } = await supabaseClient
+			.from('messages')
+			.select('id, nickname, text, created_at')
+			.order('created_at', { ascending: true })
+			.limit(100);
+		if (error) throw error;
+		chatMessages = data || [];
+		renderChat();
+	} catch (error) {
+		console.error(error);
+	}
+}
+
+chatForm?.addEventListener('submit', async (event) => {
+	event.preventDefault();
+	const text = chatInput.value.trim();
+	const nicknameInput = document.querySelector('#nickname-input');
+	const nickname = (nicknameInput?.value.trim() || 'anônimo').slice(0, 30);
+	if (!text || !supabaseClient) return;
+	localStorage.setItem(nicknameStorageKey, nickname || 'anônimo');
+	const button = chatForm.querySelector('button[type="submit"]');
+	button.disabled = true;
+	const { error } = await supabaseClient.from('messages').insert({ nickname: nickname || 'anônimo', text });
+	if (!error) {
+		chatInput.value = '';
+		await loadChatMessages();
+	} else {
+		console.error(error);
+	}
+	button.disabled = false;
+	chatInput.focus();
 });
 
-document.querySelector('#publish-topic').addEventListener('click', () => {
-  const title = input.value.trim();
-  if (!title) {
-    showToast('escreva alguma coisa antes de publicar.');
-    input.focus();
-    return;
-  }
-  topics.unshift({ title, room: activeRoom === 'todos' ? 'desabafos' : activeRoom, author: 'anônimo', time: 'agora', replies: 0, views: 1, mark: '✳' });
-  localStorage.setItem('entre-nos-topics', JSON.stringify(topics));
-  input.value = '';
-  renderTopics();
-  showToast('tópico publicado anonimamente.');
-});
-
-document.querySelector('#focus-chat').addEventListener('click', () => {
-  chatView.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  window.setTimeout(() => chatInput.focus(), 450);
-});
-
-document.querySelector('#sort-button').addEventListener('click', (event) => {
-  const newestFirst = event.currentTarget.dataset.order !== 'oldest';
-  topics.reverse();
-  event.currentTarget.dataset.order = newestFirst ? 'oldest' : 'newest';
-  event.currentTarget.textContent = newestFirst ? 'mais antigas⌄' : 'mais recentes⌄';
-  renderTopics();
-});
-
-document.querySelector('#load-more').addEventListener('click', () => showToast('você chegou ao começo da conversa.'));
-chatForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const text = chatInput.value.trim();
-  if (!text) return;
-  const submitButton = chatForm.querySelector('button');
-  submitButton.disabled = true;
-  try {
-    if (supabaseClient) {
-      const { error } = await supabaseClient.from('messages').insert({ text });
-      if (error) throw error;
-    } else {
-      const response = await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
-      });
-      if (!response.ok) throw new Error('Não foi possível enviar a mensagem.');
-    }
-    chatInput.value = '';
-    await loadChatMessages();
-  } catch (error) {
-    showToast('não foi possível enviar a mensagem.');
-  } finally {
-    submitButton.disabled = false;
-    chatInput.focus();
-  }
-});
-renderTopics();
-showRoom('zoo');
+setupNicknameField();
 loadChatMessages();
-if (!supabaseClient) window.setInterval(loadChatMessages, 2000);
 if (supabaseClient) {
-  supabaseClient
-    .channel('zoo-messages')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, loadChatMessages)
-    .subscribe();
+	supabaseClient
+		.channel('zoo-messages')
+		.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, loadChatMessages)
+		.subscribe();
 }
