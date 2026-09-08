@@ -10,8 +10,85 @@ const chatForm = document.querySelector('#chat-form');
 const chatInput = document.querySelector('#chat-input');
 const photoInput = document.querySelector('#photo-input');
 const replyPreview = document.querySelector('#reply-preview');
+const photoPreview = document.querySelector('#photo-preview');
+const photoPreviewImage = document.querySelector('#photo-preview-image');
+const clearPhotoButton = document.querySelector('#clear-photo');
+const uploadProgressWrap = document.querySelector('#photo-upload-progress');
+const uploadProgressBar = document.querySelector('#photo-upload-progress-bar');
 let replyTo = null;
 let selectedPhoto = null;
+let selectedPhotoUrl = null;
+
+function showPhotoPreview(file) {
+	if (selectedPhotoUrl) URL.revokeObjectURL(selectedPhotoUrl);
+	selectedPhotoUrl = URL.createObjectURL(file);
+	photoPreviewImage.src = selectedPhotoUrl;
+	photoPreview.hidden = false;
+}
+
+function clearPhotoPreview() {
+	if (selectedPhotoUrl) URL.revokeObjectURL(selectedPhotoUrl);
+	selectedPhotoUrl = null;
+	selectedPhoto = null;
+	photoInput.value = '';
+	photoPreviewImage.src = '';
+	photoPreview.hidden = true;
+	resetUploadProgress();
+}
+
+function setUploadProgress(percent) {
+	uploadProgressWrap.hidden = false;
+	uploadProgressBar.style.width = `${Math.max(4, percent)}%`;
+}
+
+function resetUploadProgress() {
+	uploadProgressWrap.hidden = true;
+	uploadProgressBar.style.width = '0%';
+}
+
+async function compressImage(file) {
+	if (!file.type.startsWith('image/') || file.type === 'image/gif') return file;
+	try {
+		const bitmap = await createImageBitmap(file);
+		const maxDimension = 1600;
+		let { width, height } = bitmap;
+		if (width > maxDimension || height > maxDimension) {
+			const scale = maxDimension / Math.max(width, height);
+			width = Math.round(width * scale);
+			height = Math.round(height * scale);
+		}
+		const canvas = document.createElement('canvas');
+		canvas.width = width;
+		canvas.height = height;
+		canvas.getContext('2d').drawImage(bitmap, 0, 0, width, height);
+		const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.82));
+		if (!blob || blob.size >= file.size) return file;
+		return new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' });
+	} catch (error) {
+		console.error('Falha ao comprimir imagem, enviando original.', error);
+		return file;
+	}
+}
+
+function uploadPhotoWithProgress(file, bucket, objectPath, onProgress) {
+	return new Promise((resolve, reject) => {
+		const xhr = new XMLHttpRequest();
+		xhr.open('POST', `${supabaseSettings.url}/storage/v1/object/${bucket}/${objectPath}`);
+		xhr.setRequestHeader('Authorization', `Bearer ${supabaseSettings.anonKey}`);
+		xhr.setRequestHeader('apikey', supabaseSettings.anonKey);
+		xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+		xhr.setRequestHeader('x-upsert', 'false');
+		xhr.upload.onprogress = (event) => {
+			if (event.lengthComputable && onProgress) onProgress(Math.round((event.loaded / event.total) * 100));
+		};
+		xhr.onload = () => {
+			if (xhr.status >= 200 && xhr.status < 300) resolve();
+			else reject(new Error(`Upload falhou (status ${xhr.status})`));
+		};
+		xhr.onerror = () => reject(new Error('Falha de rede no upload.'));
+		xhr.send(file);
+	});
+}
 
 function getNickname() {
 	return localStorage.getItem(nicknameStorageKey) || 'anônimo';
@@ -34,7 +111,7 @@ function setupNicknameField() {
 		nicknameInput.value = nickname;
 		localStorage.setItem(nicknameStorageKey, nickname);
 	});
-	chatForm.insertBefore(nicknameInput, chatInput);
+	chatInput.parentElement.insertBefore(nicknameInput, chatInput);
 }
 
 function messageKey(message) {
@@ -105,12 +182,22 @@ chatMessagesList.addEventListener('click', (event) => {
 });
 
 photoInput.addEventListener('change', () => {
-	selectedPhoto = photoInput.files[0] || null;
-	if (selectedPhoto && selectedPhoto.size > 5 * 1024 * 1024) {
-		selectedPhoto = null;
-		photoInput.value = '';
+	const file = photoInput.files[0] || null;
+	if (file && file.size > 5 * 1024 * 1024) {
 		alert('A foto precisa ter no máximo 5 MB.');
+		clearPhotoPreview();
+		return;
 	}
+	selectedPhoto = file;
+	if (selectedPhoto) {
+		showPhotoPreview(selectedPhoto);
+	} else {
+		clearPhotoPreview();
+	}
+});
+
+clearPhotoButton?.addEventListener('click', () => {
+	clearPhotoPreview();
 });
 
 chatForm?.addEventListener('submit', async (event) => {
@@ -125,21 +212,32 @@ chatForm?.addEventListener('submit', async (event) => {
 	let imageUrl = null;
 	let imageName = null;
 	if (selectedPhoto) {
-		const safeName = selectedPhoto.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+		const photoToUpload = await compressImage(selectedPhoto);
+		const safeName = photoToUpload.name.replace(/[^a-zA-Z0-9._-]/g, '-');
 		const objectPath = `${Date.now()}-${safeName}`;
-		const upload = await supabaseClient.storage.from('zoo-images').upload(objectPath, selectedPhoto, { upsert: false, contentType: selectedPhoto.type });
-		if (upload.error) throw upload.error;
+		try {
+			setUploadProgress(4);
+			await uploadPhotoWithProgress(photoToUpload, 'zoo-images', objectPath, setUploadProgress);
+		} catch (uploadError) {
+			console.error(uploadError);
+			resetUploadProgress();
+			button.disabled = false;
+			chatInput.focus();
+			return;
+		}
 		imageUrl = supabaseClient.storage.from('zoo-images').getPublicUrl(objectPath).data.publicUrl;
 		imageName = selectedPhoto.name;
 	}
-	const { error } = await supabaseClient.from('messages').insert({ nickname: nickname || 'anônimo', text, reply_to: replyTo?.id || null, image_url: imageUrl, image_name: imageName });
+	const { data: inserted, error } = await supabaseClient.from('messages').insert({ nickname: nickname || 'anônimo', text: text || null, reply_to: replyTo?.id || null, image_url: imageUrl, image_name: imageName }).select().single();
 	if (!error) {
+		if (inserted && !chatMessages.some((item) => item.id === inserted.id)) {
+			chatMessages.push(inserted);
+			renderChat();
+		}
 		chatInput.value = '';
-		photoInput.value = '';
-		selectedPhoto = null;
+		clearPhotoPreview();
 		replyTo = null;
 		replyPreview.hidden = true;
-		await loadChatMessages();
 	} else {
 		console.error(error);
 	}
@@ -152,6 +250,11 @@ loadChatMessages();
 if (supabaseClient) {
 	supabaseClient
 		.channel('zoo-messages')
-		.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, loadChatMessages)
+		.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+			if (payload.new && !chatMessages.some((item) => item.id === payload.new.id)) {
+				chatMessages.push(payload.new);
+				renderChat();
+			}
+		})
 		.subscribe();
 }
