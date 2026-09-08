@@ -13,8 +13,64 @@ const replyPreview = document.querySelector('#reply-preview');
 const photoPreview = document.querySelector('#photo-preview');
 const photoPreviewImage = document.querySelector('#photo-preview-image');
 const clearPhotoButton = document.querySelector('#clear-photo');
+const lightbox = document.querySelector('#lightbox');
+const lightboxImage = document.querySelector('#lightbox-image');
+const lightboxClose = document.querySelector('#lightbox-close');
+
+function openLightbox(url) {
+	if (!lightbox || !lightboxImage) return;
+	lightboxImage.src = url;
+	lightbox.hidden = false;
+}
+
+function closeLightbox() {
+	if (!lightbox || !lightboxImage) return;
+	lightbox.hidden = true;
+	lightboxImage.src = '';
+}
+
+lightboxClose?.addEventListener('click', closeLightbox);
+lightbox?.addEventListener('click', (event) => {
+	if (event.target === lightbox) closeLightbox();
+});
+document.addEventListener('keydown', (event) => {
+	if (event.key === 'Escape' && lightbox && !lightbox.hidden) closeLightbox();
+});
 const uploadProgressWrap = document.querySelector('#photo-upload-progress');
 const uploadProgressBar = document.querySelector('#photo-upload-progress-bar');
+const notifyButton = document.querySelector('#enable-notifications');
+const ownMessageIds = new Set();
+const VAPID_PUBLIC_KEY = 'BLPFhZtNI9Y7Tf19xEqitKIwh0W4IpAMz7lWaoJAuTnQfdMs2L5TNZsBrkwbB8_dfgUn-hAVfvIOUeW7xQP0R1U';
+
+function urlBase64ToUint8Array(base64String) {
+	const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+	const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+	const rawData = atob(base64);
+	return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+}
+
+async function subscribeToPush() {
+	if (!('serviceWorker' in navigator) || !('PushManager' in window) || !supabaseClient) return;
+	try {
+		const registration = await navigator.serviceWorker.register('sw.js');
+		await navigator.serviceWorker.ready;
+		let subscription = await registration.pushManager.getSubscription();
+		if (!subscription) {
+			subscription = await registration.pushManager.subscribe({
+				userVisibleOnly: true,
+				applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+			});
+		}
+		const raw = subscription.toJSON();
+		if (!raw.endpoint || !raw.keys) return;
+		await supabaseClient.from('push_subscriptions').upsert(
+			{ endpoint: raw.endpoint, p256dh: raw.keys.p256dh, auth: raw.keys.auth },
+			{ onConflict: 'endpoint' }
+		);
+	} catch (error) {
+		console.error('Falha ao inscrever para notificações push.', error);
+	}
+}
 let replyTo = null;
 let selectedPhoto = null;
 let selectedPhotoUrl = null;
@@ -89,6 +145,34 @@ function uploadPhotoWithProgress(file, bucket, objectPath, onProgress) {
 		xhr.send(file);
 	});
 }
+
+function updateNotifyButtonLabel() {
+	if (!notifyButton) return;
+	if (!('Notification' in window)) {
+		notifyButton.remove();
+		return;
+	}
+	if (Notification.permission === 'granted') {
+		notifyButton.textContent = 'notificações ativas';
+		notifyButton.disabled = true;
+	} else if (Notification.permission === 'denied') {
+		notifyButton.textContent = 'notificações bloqueadas';
+		notifyButton.disabled = true;
+	} else {
+		notifyButton.textContent = 'ativar notificações';
+		notifyButton.disabled = false;
+	}
+}
+
+notifyButton?.addEventListener('click', async () => {
+	if (!('Notification' in window)) return;
+	const permission = await Notification.requestPermission();
+	updateNotifyButtonLabel();
+	if (permission === 'granted') await subscribeToPush();
+});
+
+updateNotifyButtonLabel();
+if ('Notification' in window && Notification.permission === 'granted') subscribeToPush();
 
 function getNickname() {
 	return localStorage.getItem(nicknameStorageKey) || 'anônimo';
@@ -175,6 +259,11 @@ async function loadChatMessages() {
 }
 
 chatMessagesList.addEventListener('click', (event) => {
+	const image = event.target.closest('.message-image');
+	if (image) {
+		openLightbox(image.src);
+		return;
+	}
 	const button = event.target.closest('[data-reply-id]');
 	if (!button) return;
 	const message = chatMessages.find((item) => String(item.id) === button.dataset.replyId);
@@ -230,6 +319,7 @@ chatForm?.addEventListener('submit', async (event) => {
 	}
 	const { data: inserted, error } = await supabaseClient.from('messages').insert({ nickname: nickname || 'anônimo', text: text || null, reply_to: replyTo?.id || null, image_url: imageUrl, image_name: imageName }).select().single();
 	if (!error) {
+		if (inserted) ownMessageIds.add(inserted.id);
 		if (inserted && !chatMessages.some((item) => item.id === inserted.id)) {
 			chatMessages.push(inserted);
 			renderChat();
