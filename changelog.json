@@ -19,6 +19,16 @@
 				"composer com contador e foco mais claro",
 				"cores e fontes iguais"
 			]
+		},
+		{
+			"id": "2026-09-09-ar",
+			"date": "2026-09-09",
+			"title": "textos em árabe",
+			"items": [
+				"frases principais da tela traduzidas para o árabe",
+				"título, aviso do chat e rodapé em árabe",
+				"identidade visual mantida, só o texto mudou"
+			]
 		}
 	]
 }
