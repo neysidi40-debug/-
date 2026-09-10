@@ -16,6 +16,12 @@ const clearPhotoButton = document.querySelector('#clear-photo');
 const lightbox = document.querySelector('#lightbox');
 const lightboxImage = document.querySelector('#lightbox-image');
 const lightboxClose = document.querySelector('#lightbox-close');
+const chatEmpty = document.querySelector('#chat-empty');
+const messageCount = document.querySelector('#message-count');
+const charCount = document.querySelector('#char-count');
+const headerClock = document.querySelector('#header-clock');
+const connectionStatus = document.querySelector('#connection-status');
+const focusChatButton = document.querySelector('#focus-chat');
 
 function openLightbox(url) {
 	if (!lightbox || !lightboxImage) return;
@@ -34,7 +40,13 @@ lightbox?.addEventListener('click', (event) => {
 	if (event.target === lightbox) closeLightbox();
 });
 document.addEventListener('keydown', (event) => {
-	if (event.key === 'Escape' && lightbox && !lightbox.hidden) closeLightbox();
+	if (event.key !== 'Escape') return;
+	const changelogOverlay = document.querySelector('#changelog-overlay');
+	if (changelogOverlay && !changelogOverlay.hidden) {
+		closeChangelog();
+		return;
+	}
+	if (lightbox && !lightbox.hidden) closeLightbox();
 });
 const uploadProgressWrap = document.querySelector('#photo-upload-progress');
 const uploadProgressBar = document.querySelector('#photo-upload-progress-bar');
@@ -198,6 +210,40 @@ function setupNicknameField() {
 	chatInput.parentElement.insertBefore(nicknameInput, chatInput);
 }
 
+function updateClock() {
+	if (!headerClock) return;
+	const now = new Date();
+	headerClock.textContent = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+	headerClock.dateTime = now.toISOString();
+}
+
+function updateCharCount() {
+	if (!charCount || !chatInput) return;
+	charCount.textContent = `${chatInput.value.length}/280`;
+}
+
+function updateChatChrome() {
+	if (chatEmpty) chatEmpty.hidden = chatMessages.length > 0;
+	if (messageCount) messageCount.textContent = `${chatMessages.length} ${chatMessages.length === 1 ? 'msg' : 'msgs'}`;
+}
+
+function setConnectionStatus(label, live) {
+	if (!connectionStatus) return;
+	connectionStatus.textContent = label;
+	connectionStatus.classList.toggle('is-live', live);
+	connectionStatus.classList.toggle('is-off', !live);
+}
+
+focusChatButton?.addEventListener('click', () => {
+	document.querySelector('#chat-view')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	chatInput?.focus();
+});
+
+chatInput?.addEventListener('input', updateCharCount);
+updateClock();
+updateCharCount();
+setInterval(updateClock, 1000);
+
 function messageKey(message) {
 	return message.id || `${message.created_at || message.createdAt}-${message.nickname}-${message.text}`;
 }
@@ -223,6 +269,7 @@ function renderChat() {
 		const createdAt = message.created_at || message.createdAt;
 		const article = document.createElement('article');
 		article.className = 'chat-message';
+		if (message.id && ownMessageIds.has(message.id)) article.classList.add('is-own');
 		const reply = message.reply_to ? chatMessages.find((item) => item.id === message.reply_to) : null;
 		const replyHtml = reply ? `<button class="reply-reference" data-reply-id="${reply.id}" type="button">↪ ${escapeHtml(reply.nickname || 'anônimo')}: ${escapeHtml(reply.text || reply.image_name || 'foto')}</button>` : '';
 		const imageHtml = message.image_url ? `<img class="message-image" src="${escapeHtml(message.image_url)}" alt="Foto enviada por ${escapeHtml(message.nickname || 'anônimo')}">` : '';
@@ -231,6 +278,7 @@ function renderChat() {
 		renderedChatKeys.add(key);
 		addedMessage = true;
 	});
+	updateChatChrome();
 	if (addedMessage) chatMessagesList.scrollTop = chatMessagesList.scrollHeight;
 }
 
@@ -253,8 +301,10 @@ async function loadChatMessages() {
 		if (error) throw error;
 		chatMessages = data || [];
 		renderChat();
+		updateChatChrome();
 	} catch (error) {
 		console.error(error);
+		setConnectionStatus('offline', false);
 	}
 }
 
@@ -328,6 +378,7 @@ chatForm?.addEventListener('submit', async (event) => {
 		clearPhotoPreview();
 		replyTo = null;
 		replyPreview.hidden = true;
+		updateCharCount();
 	} else {
 		console.error(error);
 	}
@@ -335,8 +386,120 @@ chatForm?.addEventListener('submit', async (event) => {
 	chatInput.focus();
 });
 
+const changelogSeenKey = 'zoo-changelog-seen';
+const changelogOverlay = document.querySelector('#changelog-overlay');
+const changelogList = document.querySelector('#changelog-list');
+const changelogPreview = document.querySelector('#changelog-preview');
+const changelogBadge = document.querySelector('#log-badge');
+const changelogLead = document.querySelector('#changelog-lead');
+const changelogLatestDate = document.querySelector('#changelog-latest-date');
+let changelogEntries = [];
+let changelogOpenedByUpdate = false;
+
+function formatLogDate(value) {
+	const date = new Date(`${value}T12:00:00`);
+	if (Number.isNaN(date.getTime())) return value;
+	return date.toLocaleDateString('pt-BR');
+}
+
+function latestChangelogId() {
+	return changelogEntries[0]?.id || '';
+}
+
+function hasUnseenChangelog() {
+	const latest = latestChangelogId();
+	return Boolean(latest && localStorage.getItem(changelogSeenKey) !== latest);
+}
+
+function markChangelogSeen() {
+	const latest = latestChangelogId();
+	if (latest) localStorage.setItem(changelogSeenKey, latest);
+	updateChangelogBadge();
+}
+
+function updateChangelogBadge() {
+	if (!changelogBadge) return;
+	changelogBadge.hidden = !hasUnseenChangelog();
+}
+
+function renderChangelog() {
+	const latest = changelogEntries[0];
+	if (changelogLatestDate) changelogLatestDate.textContent = latest ? formatLogDate(latest.date) : '—';
+	if (changelogPreview) {
+		changelogPreview.replaceChildren();
+		changelogEntries.slice(0, 3).forEach((entry) => {
+			const item = document.createElement('li');
+			item.innerHTML = `<time datetime="${escapeHtml(entry.date)}">${escapeHtml(formatLogDate(entry.date))}</time><strong>${escapeHtml(entry.title)}</strong>`;
+			changelogPreview.append(item);
+		});
+	}
+	if (changelogList) {
+		changelogList.replaceChildren();
+		changelogEntries.forEach((entry, index) => {
+			const item = document.createElement('li');
+			item.className = `changelog-entry${index === 0 && hasUnseenChangelog() ? ' is-new' : ''}`;
+			item.dataset.id = entry.id;
+			const details = (entry.items || []).map((line) => `<li>${escapeHtml(line)}</li>`).join('');
+			item.innerHTML = `<time datetime="${escapeHtml(entry.date)}">${escapeHtml(formatLogDate(entry.date))}</time><h3>${escapeHtml(entry.title)}</h3><ul>${details}</ul>`;
+			changelogList.append(item);
+		});
+	}
+	updateChangelogBadge();
+}
+
+function openChangelog({ auto = false } = {}) {
+	if (!changelogOverlay) return;
+	changelogOpenedByUpdate = auto;
+	if (changelogLead) {
+		changelogLead.textContent = auto && changelogEntries[0]
+			? `att nova: ${changelogEntries[0].title}`
+			: 'o que mudou no ZOO';
+	}
+	renderChangelog();
+	changelogOverlay.hidden = false;
+}
+
+function closeChangelog() {
+	if (!changelogOverlay) return;
+	changelogOverlay.hidden = true;
+	markChangelogSeen();
+	changelogOpenedByUpdate = false;
+	renderChangelog();
+}
+
+async function loadChangelog({ announce = false } = {}) {
+	try {
+		const response = await fetch(`changelog.json?t=${Date.now()}`, { cache: 'no-store' });
+		if (!response.ok) throw new Error('Log indisponível.');
+		const data = await response.json();
+		changelogEntries = Array.isArray(data.entries) ? data.entries : [];
+		renderChangelog();
+		const latest = latestChangelogId();
+		if (!announce || !latest || latest === localStorage.getItem(changelogSeenKey)) return;
+		if (changelogOverlay && !changelogOverlay.hidden) return;
+		openChangelog({ auto: true });
+	} catch (error) {
+		console.error(error);
+	}
+}
+
+function setupChangelog() {
+	document.querySelector('#open-changelog')?.addEventListener('click', () => openChangelog());
+	document.querySelector('#open-changelog-sidebar')?.addEventListener('click', () => openChangelog());
+	document.querySelector('#close-changelog')?.addEventListener('click', closeChangelog);
+	changelogOverlay?.addEventListener('click', (event) => {
+		if (event.target === changelogOverlay) closeChangelog();
+	});
+	loadChangelog({ announce: true });
+	setInterval(() => loadChangelog({ announce: true }), 60 * 1000);
+	document.addEventListener('visibilitychange', () => {
+		if (document.visibilityState === 'visible') loadChangelog({ announce: true });
+	});
+}
+
 setupNicknameField();
 loadChatMessages();
+setupChangelog();
 if (supabaseClient) {
 	supabaseClient
 		.channel('zoo-messages')
@@ -346,5 +509,11 @@ if (supabaseClient) {
 				renderChat();
 			}
 		})
-		.subscribe();
+		.subscribe((status) => {
+			if (status === 'SUBSCRIBED') setConnectionStatus('ao vivo', true);
+			else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setConnectionStatus('sinal fraco', false);
+			else if (status === 'CLOSED') setConnectionStatus('offline', false);
+		});
+} else {
+	setConnectionStatus('offline', false);
 }

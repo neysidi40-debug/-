@@ -1,17 +1,181 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-	<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>ZOO // conversa anônima</title>
-	<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#080808">
-	<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ZOO"><link rel="apple-touch-icon" href="sonicchapado.jpeg">
-	<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-	<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=VT323&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css">
+	<link rel="manifest" href="manifest.json">
+	<meta name="theme-color" content="#080808">
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-title" content="ZOO">
+	<link rel="apple-touch-icon" href="sonicchapado.jpeg">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=VT323&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="style.css">
 </head>
 <body>
-	<header class="site-header"><div class="header-inner"><a class="brand" href="#top" aria-label="ZOO, página inicial"><video class="brand-mark" src="icespice.mp4" autoplay loop muted playsinline></video><span><strong>ZOO</strong><small>um espaço anônimo</small></span></a><span class="header-status">sala anônima aberta</span><button class="notify-button" id="enable-notifications" type="button">ativar notificações</button><button class="open-button" id="focus-chat" type="button">abrir ZOO</button></div></header>
-	<main class="layout" id="top"><aside class="sidebar"><figure class="hero-image"><video src="icespice.mp4" autoplay loop muted playsinline></video><figcaption>arquivo da ZOO / sem contexto</figcaption></figure><p class="eyebrow">tamo anonimo s2</p><h1>e se dar certo?<br><em>happy nation</em></h1><p class="intro-text">um lugar para conversar sem nomes, perfis ou histórico pessoal.</p><nav class="rooms" aria-label="Salas"><div class="section-label"><span>sala única</span><span>01</span></div><button class="room active" type="button"><span>◉</span><b>ZOO</b><small>ao vivo</small></button></nav><div class="sidebar-note">AQUI NÃO USAMOS NOMES.</div></aside>
-		<section class="board" aria-label="Sala de conversa ZOO"><div class="board-topline"><div><p class="eyebrow">chat / ZOO</p><h2>ZOO <span>conversa</span></h2></div></div><div class="chat-view" id="chat-view"><div class="chat-notice"><strong>ZOO</strong><span>conversa anônima</span></div><div class="chat-messages" id="chat-messages" aria-live="polite"></div><form class="chat-form-wrap" id="chat-form"><div class="photo-preview" id="photo-preview" hidden><img id="photo-preview-image" alt="Prévia da foto"><button id="clear-photo" type="button" aria-label="Remover foto">×</button><div class="photo-upload-progress" id="photo-upload-progress" hidden><div class="photo-upload-progress-bar" id="photo-upload-progress-bar"></div></div></div><div class="chat-composer"><input id="chat-input" maxlength="280" autocomplete="off" placeholder="escreva uma mensagem..." aria-label="Mensagem"><label class="photo-button" title="Escolher foto">＋<input id="photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden></label><button type="submit" aria-label="Enviar">↗</button></div></form><p class="reply-preview" id="reply-preview" hidden></p><p class="chat-footer">sem nomes ou perfis</p></div></section>
-	</main><div class="lightbox" id="lightbox" hidden><button class="lightbox-close" id="lightbox-close" type="button" aria-label="Fechar">×</button><img id="lightbox-image" alt="Foto ampliada"></div><footer class="site-footer"><span>ZOO © 2024</span><span>um espaço anônimo para conversar</span></footer>
-	<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="app.js"></script>
-</body></html>
+	<div class="grain" aria-hidden="true"></div>
+	<div class="scanlines" aria-hidden="true"></div>
+
+	<header class="site-header">
+		<div class="header-inner">
+			<a class="brand" href="#top" aria-label="ZOO, página inicial">
+				<span class="brand-mark-wrap">
+					<video class="brand-mark" src="icespice.mp4" autoplay loop muted playsinline></video>
+				</span>
+				<span>
+					<strong>ZOO</strong>
+					<small>um espaço anônimo</small>
+				</span>
+			</a>
+			<div class="header-status">
+				<span class="live-pill"><span class="live-dot" aria-hidden="true"></span>sala anônima aberta</span>
+				<time id="header-clock" datetime="">--:--</time>
+			</div>
+			<div class="header-actions">
+				<button class="notify-button log-button" id="open-changelog" type="button">
+					log <span class="log-badge" id="log-badge" hidden>att</span>
+				</button>
+				<button class="notify-button" id="enable-notifications" type="button">ativar notificações</button>
+				<button class="open-button" id="focus-chat" type="button">abrir ZOO</button>
+			</div>
+		</div>
+	</header>
+
+	<main class="layout" id="top">
+		<aside class="sidebar">
+			<figure class="hero-image">
+				<video src="icespice.mp4" autoplay loop muted playsinline></video>
+				<figcaption>arquivo da ZOO / sem contexto</figcaption>
+				<span class="hero-stamp">REC</span>
+			</figure>
+			<p class="eyebrow">tamo anonimo s2</p>
+			<h1>e se dar certo?<br><em>happy nation</em></h1>
+			<p class="intro-text">um lugar para conversar sem nomes, perfis ou histórico pessoal.</p>
+
+			<div class="stat-grid" aria-hidden="true">
+				<div class="stat-card"><span>canal</span><b>01</b></div>
+				<div class="stat-card"><span>modo</span><b>live</b></div>
+				<div class="stat-card"><span>id</span><b>off</b></div>
+			</div>
+
+			<nav class="rooms" aria-label="Salas">
+				<div class="section-label"><span>sala única</span><span>01</span></div>
+				<button class="room active" type="button">
+					<span class="room-mark">◉</span>
+					<b>ZOO</b>
+					<small>ao vivo</small>
+				</button>
+			</nav>
+
+			<section class="changelog-rail" aria-label="Log de atualizações">
+				<div class="section-label"><span>log</span><span id="changelog-latest-date">—</span></div>
+				<ol class="changelog-preview" id="changelog-preview"></ol>
+				<button class="log-more" id="open-changelog-sidebar" type="button">ver log completo</button>
+			</section>
+
+			<ul class="protocol">
+				<li>sem cadastro</li>
+				<li>sem histórico pessoal</li>
+				<li>texto ou foto, no mesmo fio</li>
+			</ul>
+			<div class="sidebar-note">AQUI NÃO USAMOS NOMES.</div>
+		</aside>
+
+		<section class="board" aria-label="Sala de conversa ZOO">
+			<div class="board-window">
+				<div class="window-chrome" aria-hidden="true">
+					<span class="window-dots"><i></i><i></i><i></i></span>
+					<span>ZOO://chat</span>
+					<span id="connection-status" class="connection-status">conectando</span>
+				</div>
+
+				<div class="board-topline">
+					<div>
+						<p class="eyebrow">chat / ZOO</p>
+						<h2>ZOO <span>conversa</span></h2>
+					</div>
+					<div class="board-meta">
+						<span id="message-count">0 msgs</span>
+						<span class="meta-sep" aria-hidden="true">/</span>
+						<span>280 max</span>
+					</div>
+				</div>
+
+				<div class="chat-view" id="chat-view">
+					<div class="chat-notice">
+						<strong>ZOO</strong>
+						<span>conversa anônima</span>
+						<span class="notice-tag">público</span>
+					</div>
+
+					<div class="chat-stream">
+						<div class="chat-empty" id="chat-empty">
+							<span class="empty-glyph">⌘</span>
+							<strong>ainda ninguém falou</strong>
+							<span>a primeira mensagem abre o fio</span>
+						</div>
+						<div class="chat-messages" id="chat-messages" aria-live="polite"></div>
+					</div>
+
+					<form class="chat-form-wrap" id="chat-form">
+						<div class="photo-preview" id="photo-preview" hidden>
+							<img id="photo-preview-image" alt="Prévia da foto">
+							<button id="clear-photo" type="button" aria-label="Remover foto">×</button>
+							<div class="photo-upload-progress" id="photo-upload-progress" hidden>
+								<div class="photo-upload-progress-bar" id="photo-upload-progress-bar"></div>
+							</div>
+						</div>
+						<p class="reply-preview" id="reply-preview" hidden></p>
+						<div class="chat-composer">
+							<input id="chat-input" maxlength="280" autocomplete="off" placeholder="escreva uma mensagem..." aria-label="Mensagem">
+							<label class="photo-button" title="Escolher foto">＋<input id="photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden></label>
+							<button type="submit" aria-label="Enviar">↗</button>
+						</div>
+						<div class="composer-meta">
+							<span id="char-count">0/280</span>
+							<span>enter envia</span>
+						</div>
+					</form>
+					<p class="chat-footer">sem nomes ou perfis</p>
+				</div>
+			</div>
+		</section>
+	</main>
+
+	<div class="changelog-overlay" id="changelog-overlay" hidden>
+		<div class="changelog-panel" role="dialog" aria-modal="true" aria-labelledby="changelog-title">
+			<div class="window-chrome">
+				<span class="window-dots"><i></i><i></i><i></i></span>
+				<span>ZOO://log</span>
+				<button class="changelog-close" id="close-changelog" type="button" aria-label="Fechar log">×</button>
+			</div>
+			<div class="changelog-head">
+				<p class="eyebrow">atualizações</p>
+				<h2 id="changelog-title">log <span>da sala</span></h2>
+				<p class="changelog-lead" id="changelog-lead">o que mudou no ZOO</p>
+			</div>
+			<ol class="changelog-list" id="changelog-list"></ol>
+		</div>
+	</div>
+
+	<div class="lightbox" id="lightbox" hidden>
+		<button class="lightbox-close" id="lightbox-close" type="button" aria-label="Fechar">×</button>
+		<figure class="lightbox-frame">
+			<img id="lightbox-image" alt="Foto ampliada">
+			<figcaption>toque fora ou ESC para fechar</figcaption>
+		</figure>
+	</div>
+
+	<footer class="site-footer">
+		<span>ZOO © 2024</span>
+		<span class="footer-mid">sinal aberto · sem rastros</span>
+		<span>um espaço anônimo para conversar</span>
+	</footer>
+
+	<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+	<script src="supabase-config.js"></script>
+	<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+	"entries": [
+		{
+			"id": "2026-09-09-log",
+			"date": "2026-09-09",
+			"title": "log de atualizações",
+			"items": [
+				"painel de log no site",
+				"abre sozinho quando sobe uma att nova",
+				"histórico fica visível na lateral"
+			]
+		},
+		{
+			"id": "2026-09-09-ui",
+			"date": "2026-09-09",
+			"title": "interface reforçada",
+			"items": [
+				"janela do chat, status ao vivo e estado vazio",
+				"composer com contador e foco mais claro",
+				"cores e fontes iguais"
+			]
+		}
+	]
+}

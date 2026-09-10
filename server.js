@@ -13,7 +13,9 @@ http.createServer(async (request, response) => {
 	if (!file.startsWith(`${root}${path.sep}`)) { response.writeHead(403); response.end(); return; }
 	try {
 		const content = await fs.readFile(file);
-		response.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
+		const headers = { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' };
+		if (requested === '/changelog.json') headers['Cache-Control'] = 'no-store';
+		response.writeHead(200, headers);
 		response.end(content);
 	} catch {
 		response.writeHead(404);
